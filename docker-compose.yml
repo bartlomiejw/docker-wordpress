@@ -1,0 +1,104 @@
+version: '3.6'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: ${PROJECT_NAME}_nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - "./services/nginx/:/etc/nginx/templates/"
+      - ./src:/var/www/html:rw,cached
+      - ./certs:/etc/certs
+    environment:
+      - "NGINX_ENVSUBST_TEMPLATE_SUFFIX=.conf"
+      - "DOMAIN=${DOMAIN}"
+    depends_on:
+      - wordpress
+    restart: always
+
+  varnish:
+    container_name: ${PROJECT_NAME}_varnish
+    build:
+      context: ./services/varnish
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION}
+        VARNISH_MEMORY: ${VARNISH_MEMORY}
+    environment:
+      VIRTUAL_HOST: ${DOMAIN},www.${DOMAIN}
+    restart: always
+    depends_on:
+      - nginx
+
+  php:
+    container_name: ${PROJECT_NAME}_php
+    build:
+      context: ./services/php
+      args:
+        PHP_VERSION: ${PHP_VERSION}
+    restart: always
+    volumes:
+      - ./src:/var/www/html:rw,cached
+    depends_on:
+      - mysql
+      - wordpress
+
+  mysql:
+    image: mariadb:10.7
+    container_name: ${PROJECT_NAME}_mysql
+    command: --lower_case_table_names=2
+    volumes:
+      - './data/db:/var/lib/mysql:delegated'
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    restart: always
+    ports:
+      - '3306:3306'
+
+  wordpress:
+    container_name: ${PROJECT_NAME}_wordpress
+    build:
+      context: ./services/wordpress
+      dockerfile: Dockerfile
+      args:
+        WORDPRESS_VERSION: ${WORDPRESS_VERSION}
+    volumes:
+      - ./src:/var/www/html:rw,cached
+      - ./services/php/php.ini:/usr/local/etc/php/conf.d/php.ini
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    platform: linux/amd64
+    container_name: ${PROJECT_NAME}_phpmyadmin
+    volumes:
+      - ./services/phpmyadmin/phpmyadmin.ini:/usr/local/etc/php/conf.d/phpmyadmin.ini
+    environment:
+      VIRTUAL_HOST: "phpmyadmin.${PROJECT_NAME}.local"
+      PMA_ABSOLUTE_URI: "http://phpmyadmin.${PROJECT_NAME}.local/"
+      PMA_ARBITRARY: 1
+      PMA_HOST: "${MYSQL_HOST}"
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+    ports:
+      - '8082:80'
+    links:
+      - mysql:mysql
+
+  mailhog:
+    container_name: ${PROJECT_NAME}_mailhog
+    platform: linux/amd64
+    image: mailhog/mailhog
+    environment:
+      VIRTUAL_PORT: 8025
+      VIRTUAL_HOST: "mail.${PROJECT_NAME}.local"
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+volumes:
+  src:
+  mysql_data:
