@@ -1,3 +1,5 @@
 /backups/
 /data/
 /certs/
+.idea
+.DS_Store
