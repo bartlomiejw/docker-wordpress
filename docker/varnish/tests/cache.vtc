@@ -1,0 +1,101 @@
+varnishtest "WordPress caching policy"
+
+server s1 {
+    # 1-2: anonymous page, fetched once
+    rxreq
+    expect req.url == "/"
+    expect req.http.Cookie == <undef>
+    txresp -body "home"
+
+    # 3: tracking parameters stripped before reaching the backend
+    rxreq
+    expect req.url == "/about/"
+    txresp -body "about"
+
+    # 4-5: logged-in user, always passed
+    rxreq
+    expect req.http.Cookie ~ "wordpress_logged_in_"
+    txresp -body "dashboard-1"
+    rxreq
+    txresp -body "dashboard-2"
+
+    # 6: admin area, passed
+    rxreq
+    expect req.url == "/wp/wp-admin/"
+    txresp -body "admin"
+
+    # 7: static asset, cookies stripped and Set-Cookie removed
+    rxreq
+    expect req.url == "/app/themes/x/style.css"
+    expect req.http.Cookie == <undef>
+    txresp -hdr "Set-Cookie: foo=bar" -body "css"
+
+    # 8: refetch after PURGE
+    rxreq
+    expect req.url == "/"
+    txresp -body "home-v2"
+} -start
+
+varnish v1 -vcl+backend {
+    include "${testdir}/../wordpress.vcl";
+} -start
+
+client c1 {
+    txreq -url "/" -hdr "Cookie: _ga=GA1.1.123; wordpress_test_cookie=WP"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Cache == "MISS"
+    expect resp.http.x-url == <undef>
+
+    txreq -url "/"
+    rxresp
+    expect resp.body == "home"
+    expect resp.http.X-Cache == "HIT"
+
+    txreq -url "/about/?utm_source=newsletter&utm_medium=email"
+    rxresp
+    expect resp.body == "about"
+
+    txreq -url "/" -hdr "Cookie: wordpress_logged_in_abc=user"
+    rxresp
+    expect resp.body == "dashboard-1"
+    expect resp.http.X-Cache == "PASS"
+
+    txreq -url "/" -hdr "Cookie: wordpress_logged_in_abc=user"
+    rxresp
+    expect resp.body == "dashboard-2"
+
+    txreq -url "/wp/wp-admin/"
+    rxresp
+    expect resp.body == "admin"
+    expect resp.http.X-Cache == "PASS"
+
+    txreq -url "/app/themes/x/style.css" -hdr "Cookie: wordpress_logged_in_abc=user"
+    rxresp
+    expect resp.http.Set-Cookie == <undef>
+    expect resp.http.X-Cache == "MISS"
+
+    txreq -url "/app/themes/x/style.css"
+    rxresp
+    expect resp.body == "css"
+    expect resp.http.X-Cache == "HIT"
+
+    # Purge through the edge proxy is rejected...
+    txreq -req PURGE -url "/" -hdr "X-Real-Ip: 203.0.113.10"
+    rxresp
+    expect resp.status == 405
+
+    # ...but allowed from the internal network.
+    txreq -req PURGE -url "/"
+    rxresp
+    expect resp.status == 200
+
+    txreq -url "/"
+    rxresp
+    expect resp.body == "home-v2"
+    expect resp.http.X-Cache == "MISS"
+
+    txreq -url "/varnish-health"
+    rxresp
+    expect resp.status == 200
+} -run

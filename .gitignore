@@ -1,0 +1,22 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Generated Bedrock project (created by `make init`).
+# In a real site repository you would commit app/ (minus app/vendor etc.).
+/app/
+
+# TLS material
+/certs/
+acme.json
+
+# Database dumps and backups
+/backups/
+*.sql
+*.sql.gz
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

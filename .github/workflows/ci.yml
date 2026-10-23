@@ -1,0 +1,75 @@
+---
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (hadolint, shellcheck, yamllint)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: make lint
+
+  compose:
+    name: Compose config (local + prod)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: make config
+
+  vcl:
+    name: VCL compile + varnishtest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: make test-vcl
+
+  smoke:
+    name: Smoke test (full stack)
+    needs: [lint, compose, vcl]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Init (.env, self-signed certs, Bedrock)
+        run: make init
+
+      - name: Start stack
+        run: make up
+
+      - name: Smoke test
+        run: make smoke
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color --tail=200
+
+      - name: Tear down
+        if: always()
+        run: make destroy

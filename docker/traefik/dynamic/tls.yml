@@ -1,0 +1,29 @@
+---
+# Dynamic TLS configuration (file provider). This file is rendered by Traefik
+# as a Go template before it is parsed as YAML.
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+      curvePreferences:
+        - X25519
+        - CurveP256
+
+  # Local mode only: serve the mkcert/openssl certificate from ./certs as the
+  # default certificate. The template guard keeps this block out of
+  # production, where Let's Encrypt issues certificates instead.
+  # {{ if env "TRAEFIK_LOCAL_CERT" }}
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/local.pem
+        keyFile: /certs/local-key.pem
+        # {{ end }}

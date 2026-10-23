@@ -1,0 +1,14 @@
+---
+extends: default
+
+ignore: |
+  app/
+  backups/
+
+rules:
+  line-length:
+    max: 160
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    check-keys: false

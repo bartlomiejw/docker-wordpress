@@ -1,0 +1,24 @@
+---
+# Shared middlewares (file provider), referenced from container labels as
+# <name>@file. The file is rendered as a Go template, so the env function
+# reads variables from the Traefik container environment.
+http:
+  middlewares:
+    security-headers:
+      headers:
+        # SAMEORIGIN (not DENY) keeps the WordPress Customizer preview working.
+        customFrameOptionsValue: SAMEORIGIN
+        contentTypeNosniff: true
+        browserXssFilter: false
+        referrerPolicy: strict-origin-when-cross-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          Server: ""
+          X-Powered-By: ""
+
+    admin-auth:
+      basicAuth:
+        realm: admin
+        removeHeader: true
+        users:
+          - '{{ env "TRAEFIK_BASIC_AUTH_USERS" }}'

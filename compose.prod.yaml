@@ -1,0 +1,91 @@
+---
+# Production overlay:
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d
+# (or `make up MODE=prod`)
+#
+# - Let's Encrypt certificates via the TLS-ALPN-01 challenge
+# - Traefik dashboard disabled
+# - Ports published on all interfaces, HSTS enabled
+# - Mailpit disabled: point SMTP_HOST/SMTP_PORT at a real relay
+
+services:
+  traefik:
+    command:
+      - --global.checknewversion=false
+      - --global.sendanonymoususage=false
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+      - --ping=true
+      - --api.dashboard=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      # Drop headers like X_Forwarded_For that PHP/nginx would read as X-Forwarded-For.
+      - --entrypoints.web.http.aliasheadersstrategy=delete
+      - --entrypoints.websecure.http.aliasheadersstrategy=delete
+      - --entrypoints.traefik.address=:8080
+      - --entrypoints.traefik.http.aliasheadersstrategy=delete
+      - --entrypoints.websecure.http.tls.certresolver=letsencrypt
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set ACME_EMAIL in .env}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${COMPOSE_PROJECT_NAME:-wordpress}_edge
+      - --providers.docker.constraints=Label(`com.docker.compose.project`,`${COMPOSE_PROJECT_NAME:-wordpress}`)
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+    environment:
+      TRAEFIK_LOCAL_CERT: ""
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes: !override
+      - ./docker/traefik/dynamic:/etc/traefik/dynamic:ro
+      - traefik-acme:/letsencrypt
+    labels:
+      # No dashboard router in production.
+      traefik.enable: "false"
+    restart: always
+
+  varnish:
+    labels:
+      traefik.http.routers.wordpress.middlewares: security-headers@file,hsts@docker
+      traefik.http.middlewares.hsts.headers.stsSeconds: "31536000"
+    restart: always
+
+  nginx:
+    restart: always
+
+  php:
+    environment:
+      WP_ENV: production
+      PHP_OPCACHE_REVALIDATE_FREQ: "60"
+    restart: always
+
+  wp-cli:
+    environment:
+      WP_ENV: production
+
+  db:
+    restart: always
+
+  redis:
+    restart: always
+
+  socket-proxy:
+    restart: always
+
+  mailpit:
+    # Only started when the "dev" profile is explicitly enabled.
+    profiles: ["dev"]
+
+  phpmyadmin:
+    labels:
+      traefik.http.routers.pma.middlewares: admin-auth@file,security-headers@file
+
+volumes:
+  traefik-acme:
