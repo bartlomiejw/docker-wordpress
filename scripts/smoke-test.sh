@@ -48,7 +48,13 @@ done
 
 log "Edge"
 check "HTTP redirects to HTTPS" "301" "$(status "http://${domain}:${http_port}/")"
-check "Redirect target" "${site}/" "$(header Location "http://${domain}:${http_port}/")"
+# Traefik omits the default port from the Location header.
+if [[ "${https_port}" == "443" ]]; then
+    expected_location="https://${domain}/"
+else
+    expected_location="${site}/"
+fi
+check "Redirect target" "${expected_location}" "$(header Location "http://${domain}:${http_port}/")"
 check "Dashboard requires auth" "401" "$(status "${dashboard}/dashboard/")"
 check "Dashboard with credentials" "200" \
     "$(status -u "admin:${TRAEFIK_DASHBOARD_PASSWORD}" "${dashboard}/dashboard/")"
