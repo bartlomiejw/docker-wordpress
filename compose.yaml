@@ -211,7 +211,7 @@ services:
     logging: *logging
 
   db:
-    image: mariadb:11.4
+    image: mariadb:13.0
     environment:
       MARIADB_DATABASE: ${DB_NAME}
       MARIADB_USER: ${DB_USER}
