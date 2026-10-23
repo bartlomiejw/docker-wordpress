@@ -18,6 +18,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Stay on the MariaDB LTS line; LTS upgrades are done deliberately.
+      - dependency-name: mariadb
+        update-types: ["version-update:semver-major"]
     groups:
       images-minor:
         update-types: [minor, patch]
