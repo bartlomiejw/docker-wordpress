@@ -3,7 +3,7 @@
 # PHP-FPM runtime for a Bedrock-based WordPress site.
 # The same image is used by the `php` service (FPM) and the `wp-cli` service.
 
-FROM mlocati/php-extension-installer:2.12 AS ext-installer
+FROM mlocati/php-extension-installer:2.13 AS ext-installer
 
 FROM php:8.3-fpm-trixie
 
