@@ -5,7 +5,7 @@
 
 FROM mlocati/php-extension-installer:2.12 AS ext-installer
 
-FROM php:8.3-fpm-trixie
+FROM php:8.5-fpm-trixie
 
 # Run FPM workers with the host UID/GID so bind-mounted files stay writable
 # (uploads, object-cache drop-in) without chmod 777. Defaults match www-data.
