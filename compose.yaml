@@ -125,7 +125,7 @@ services:
     logging: *logging
 
   varnish:
-    image: varnish:9.0
+    image: varnish:9.1
     environment:
       VARNISH_SIZE: ${VARNISH_SIZE:-256M}
     volumes:
@@ -232,7 +232,7 @@ services:
     logging: *logging
 
   redis:
-    image: redis:8.6-alpine
+    image: redis:8.10-alpine
     # Pure cache: bounded memory, LRU eviction, no persistence.
     command:
       - redis-server
@@ -255,7 +255,7 @@ services:
     logging: *logging
 
   mailpit:
-    image: axllent/mailpit:v1.32
+    image: axllent/mailpit:v1.34
     environment:
       MP_MAX_MESSAGES: 500
     networks:
